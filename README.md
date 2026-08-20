@@ -5,7 +5,7 @@ It opens a source file in a read-only terminal overlay, shows comments from the
 agent, and lets a person reply or add line-anchored notes before returning the
 review to Pi.
 
-![Pi Marginalia reviewing its own README](https://raw.githubusercontent.com/rrvsh/pi-marginalia/prime/docs/marginalia.png)
+![Pi Marginalia reviewing its own README](docs/marginalia.png)
 
 ## Workflow
 
