@@ -5,11 +5,13 @@ It opens a source file in a read-only terminal overlay, shows comments from the
 agent, and lets a person reply or add line-anchored notes before returning the
 review to Pi.
 
-## Current workflow
+![Pi Marginalia reviewing its own README](https://raw.githubusercontent.com/rrvsh/pi-marginalia/prime/docs/marginalia.png)
 
-The current release provides the `annotate_file` tool. The agent supplies a
-path and comments. Marginalia then opens the file in a floating TUI overlay.
-The source stays unchanged.
+## Workflow
+
+Marginalia provides the `annotate_file` tool. The agent supplies a path and
+comments. Marginalia then opens the file in a floating TUI overlay. The source
+stays unchanged.
 
 The overlay provides:
 
@@ -29,26 +31,25 @@ extend a range. Press `Tab` to move through comments. Press `a` to add a note,
 
 ## Install
 
-The package is prepared for the Pi package gallery but has not been published
-to npm yet.
-
-```sh
-pi install git:github.com/rrvsh/pi-marginalia
-```
-
-After the first npm release, the preferred command will be:
+Install Marginalia from npm:
 
 ```sh
 pi install npm:pi-marginalia
 ```
 
-The first npm release requires a maintainer npm account with two-factor
-authentication. Publish that first version manually after reviewing the
-package tarball. Then configure npm trusted publishing with owner `rrvsh`,
-repository `pi-marginalia`, workflow `publish.yml`, and environment `npm`.
-Later GitHub Releases publish through OIDC. No npm token is stored in GitHub.
+Try it for one Pi session without saving it to your settings:
 
-For local development, install from a checkout:
+```sh
+pi -e npm:pi-marginalia
+```
+
+Install the latest source from GitHub:
+
+```sh
+pi install git:github.com/rrvsh/pi-marginalia
+```
+
+Install it from a local checkout:
 
 ```sh
 pi install /path/to/pi-marginalia
@@ -61,10 +62,10 @@ binary files and invalid line ranges. It never writes the reviewed source.
 It checks the file hash before submission and refuses to stage feedback if the
 file changed.
 
-Pi loads the TypeScript extension directly. This package targets Pi 0.80.x and
-uses Pi's supplied `@earendil-works/pi-coding-agent`, `@earendil-works/pi-tui`,
-and `typebox` modules. The extension needs Pi's TUI mode. It does not run in
-print, JSON, or RPC mode.
+Pi loads the TypeScript extension directly. This package is tested with Pi
+0.80.5 and uses Pi's supplied `@earendil-works/pi-coding-agent`,
+`@earendil-works/pi-tui`, and `typebox` modules. The extension needs Pi's TUI
+mode. It does not run in print, JSON, or RPC mode.
 
 Pi extensions run with the user's permissions. Review the source before
 installing third-party packages.
@@ -84,7 +85,13 @@ nix build .#pi-marginalia --no-link
 The Nix flake supports `x86_64-linux` and `aarch64-darwin`. The development
 shell provides Node 22 and npm tooling.
 
-## Nix installation
+## Nix package
+
+Build the package from GitHub:
+
+```sh
+nix build github:rrvsh/pi-marginalia#pi-marginalia
+```
 
 The flake exports `pi-marginalia` and `default`. The package installs an
 npm-shaped Pi package tree and exposes `passthru.packagePath` for downstream
@@ -92,28 +99,17 @@ Home Manager modules.
 
 ## Updates and removal
 
-After npm publication, update the package with:
+Update the npm package:
 
 ```sh
 pi update npm:pi-marginalia
 ```
 
-After npm publication, remove it with:
+Remove the npm package:
 
 ```sh
 pi remove npm:pi-marginalia
 ```
-
-Before npm publication, update or remove the Git installation by using the
-same Git source with Pi's package management commands. The Git installation
-command is not a substitute for reviewing package source and its permissions.
-
-## Future scope
-
-The review model is intentionally small. Future releases may add persistent
-review sessions, multiple files, Git diffs, agent follow-up threads, resolved
-comments, and review surfaces for plans or other text. Those features are not
-part of the current package contract.
 
 ## License
 
