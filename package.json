@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "A shared human-agent review surface for source files in Pi",
   "license": "MIT",
-  "author": "Rafiq V. Q. R. <rafiq@rrv.sh>",
+  "author": "Rafiq Rashid <rafiq@rrv.sh>",
   "type": "module",
   "keywords": [
     "pi-package",
