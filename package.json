@@ -1,0 +1,64 @@
+{
+  "name": "pi-marginalia",
+  "version": "0.1.0",
+  "description": "A shared human-agent review surface for source files in Pi",
+  "license": "MIT",
+  "author": "Rafiq Rashid <rafiq@rrv.sh>",
+  "type": "module",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "code-review",
+    "annotation"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rrvsh/pi-marginalia.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rrvsh/pi-marginalia/issues"
+  },
+  "homepage": "https://github.com/rrvsh/pi-marginalia#readme",
+  "files": [
+    "LICENSE",
+    "README.md",
+    "extensions/marginalia.ts"
+  ],
+  "pi": {
+    "extensions": [
+      "./extensions/marginalia.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-coding-agent": {
+      "optional": true
+    },
+    "@earendil-works/pi-tui": {
+      "optional": true
+    },
+    "typebox": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "0.80.5",
+    "@earendil-works/pi-tui": "0.80.5",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typebox": "^1.1.38",
+    "typescript": "^5.0.0"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test tests/**/*.test.ts",
+    "validate-package": "node --import tsx tests/package-content.test.ts"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
