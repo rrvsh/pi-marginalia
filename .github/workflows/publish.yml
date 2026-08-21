@@ -37,6 +37,6 @@ jobs:
       - name: Check tag and package version
         env:
           TAG: ${{ github.event.release.tag_name }}
-        run: test "${TAG#v}" = "$(node -p 'require(\"./package.json\").version')"
+        run: test "${TAG#v}" = "$(node -p 'require("./package.json").version')"
       - name: Publish with npm trusted publishing
         run: npm publish --provenance --access public
