@@ -1,6 +1,6 @@
 {
   "name": "pi-marginalia",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A shared human-agent review surface for source files in Pi",
   "license": "MIT",
   "author": "Rafiq Rashid <rafiq@rrv.sh>",
@@ -22,12 +22,14 @@
   "files": [
     "LICENSE",
     "README.md",
+    "docs/marginalia.png",
     "extensions/marginalia.ts"
   ],
   "pi": {
     "extensions": [
       "./extensions/marginalia.ts"
-    ]
+    ],
+    "image": "https://raw.githubusercontent.com/rrvsh/pi-marginalia/prime/docs/marginalia.png"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",

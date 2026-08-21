@@ -16,6 +16,7 @@
             ../package.json
             ../README.md
             ../LICENSE
+            ../docs
             ../extensions
           ];
         };
@@ -23,7 +24,7 @@
         installPhase = ''
           runHook preInstall
           mkdir -p "$out/${packagePath}"
-          cp -R package.json README.md LICENSE extensions "$out/${packagePath}/"
+          cp -R package.json README.md LICENSE docs extensions "$out/${packagePath}/"
           runHook postInstall
         '';
 
@@ -33,6 +34,7 @@
           runHook preInstallCheck
           pkg="$out/${packagePath}"
           test -f "$pkg/package.json"
+          test -f "$pkg/docs/marginalia.png"
           test -f "$pkg/extensions/marginalia.ts"
           PNAME="${pname}" PVERSION="${version}" node - "$pkg/package.json" <<'NODE'
           const fs = require("fs");
