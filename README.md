@@ -63,7 +63,7 @@ It checks the file hash before submission and refuses to stage feedback if the
 file changed.
 
 Pi loads the TypeScript extension directly. This package is tested with Pi
-0.80.5 and uses Pi's supplied `@earendil-works/pi-coding-agent`,
+0.84.2 and uses Pi's supplied `@earendil-works/pi-coding-agent`,
 `@earendil-works/pi-tui`, and `typebox` modules. The extension needs Pi's TUI
 mode. It does not run in print, JSON, or RPC mode.
 
