@@ -1,6 +1,6 @@
 {
   "name": "pi-marginalia",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A shared human-agent review surface for source files in Pi",
   "license": "MIT",
   "author": "Rafiq Rashid <rafiq@rrv.sh>",
