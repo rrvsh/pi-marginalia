@@ -75,6 +75,183 @@ test("wraps source rows and focuses comments with two lines of context", () => {
   assert.equal(commentFocusOffset(1, [0, 1, 2], 4, 2), 0);
 });
 
+test("source movement selects an intersecting comment without expanding to its range", () => {
+  const component = new FileReviewComponent(
+    makeTui(), theme as any, "/tmp/source.nix", ["one", "two", "three", "four", "five"],
+    ["one", "two", "three", "four", "five"],
+    [{ id: "agent-1", startLine: 2, endLine: 4, text: "Review these lines" }], "hash", async () => Buffer.from(""), () => {},
+  );
+
+  component.handleInput("j");
+
+  assert.equal((component as any).selectedComment()?.id, "agent-1");
+  assert.deepEqual((component as any).selectedRange(), { startLine: 2, endLine: 2 });
+});
+
+test("reply begins from a source-selected PI comment without tabbing", () => {
+  const component = new FileReviewComponent(
+    makeTui(), theme as any, "/tmp/source.nix", ["one", "two", "three"], ["one", "two", "three"],
+    [{ id: "agent-1", startLine: 2, endLine: 2, text: "Check line two" }], "hash", async () => Buffer.from(""), () => {},
+  );
+
+  component.handleInput("j");
+  component.handleInput("r");
+  for (const character of "direct reply") component.handleInput(character);
+  component.handleInput("\r");
+
+  assert.match(component.render(100).join("\n"), /direct reply/);
+});
+
+test("source ranges keep the intersecting comment selected without snapping subset or superset", () => {
+  const component = new FileReviewComponent(
+    makeTui(), theme as any, "/tmp/source.nix", ["one", "two", "three", "four", "five"],
+    ["one", "two", "three", "four", "five"],
+    [{ id: "agent-1", startLine: 2, endLine: 4, text: "Review these lines" }], "hash", async () => Buffer.from(""), () => {},
+  );
+
+  component.handleInput("j");
+  component.handleInput("J");
+  assert.equal((component as any).selectedComment()?.id, "agent-1");
+  assert.deepEqual((component as any).selectedRange(), { startLine: 2, endLine: 3 });
+
+  component.handleInput("J");
+  assert.equal((component as any).selectedComment()?.id, "agent-1");
+  assert.deepEqual((component as any).selectedRange(), { startLine: 2, endLine: 4 });
+
+  component.handleInput("J");
+  assert.equal((component as any).selectedComment()?.id, "agent-1");
+  assert.deepEqual((component as any).selectedRange(), { startLine: 2, endLine: 5 });
+
+  component.handleInput("k");
+  assert.equal((component as any).selectedComment()?.id, "agent-1");
+  assert.deepEqual((component as any).selectedRange(), { startLine: 4, endLine: 4 });
+
+  component.handleInput("j");
+  assert.equal((component as any).selectedComment(), undefined);
+  assert.deepEqual((component as any).selectedRange(), { startLine: 5, endLine: 5 });
+});
+
+test("a partial source overlap selects the comment without moving either range edge", () => {
+  const component = new FileReviewComponent(
+    makeTui(), theme as any, "/tmp/source.nix", ["one", "two", "three", "four"],
+    ["one", "two", "three", "four"],
+    [{ id: "agent-1", startLine: 2, endLine: 4, text: "Review these lines" }], "hash", async () => Buffer.from(""), () => {},
+  );
+
+  component.handleInput("J");
+
+  assert.equal((component as any).selectedComment()?.id, "agent-1");
+  assert.deepEqual((component as any).selectedRange(), { startLine: 1, endLine: 2 });
+});
+
+test("overlapping source comments preserve the active one until the range leaves it", () => {
+  const component = new FileReviewComponent(
+    makeTui(), theme as any, "/tmp/source.nix", ["one", "two", "three", "four", "five"],
+    ["one", "two", "three", "four", "five"],
+    [
+      { id: "agent-a", startLine: 2, endLine: 4, text: "First overlap" },
+      { id: "agent-b", startLine: 4, endLine: 5, text: "Second overlap" },
+    ], "hash", async () => Buffer.from(""), () => {},
+  );
+
+  component.handleInput("j");
+  component.handleInput("j");
+  assert.equal((component as any).selectedComment()?.id, "agent-a");
+
+  component.handleInput("\t");
+  assert.equal((component as any).selectedComment()?.id, "agent-b");
+
+  component.handleInput("k");
+  assert.equal((component as any).selectedComment()?.id, "agent-b");
+
+  component.handleInput("k");
+  assert.equal((component as any).selectedComment()?.id, "agent-a");
+});
+
+test("an active longer comment survives entering a nested comment start line", () => {
+  const component = new FileReviewComponent(
+    makeTui(), theme as any, "/tmp/source.nix", ["one", "two", "three", "four", "five"],
+    ["one", "two", "three", "four", "five"],
+    [
+      { id: "agent-long", startLine: 2, endLine: 5, text: "Long comment" },
+      { id: "agent-nested", startLine: 3, endLine: 3, text: "Nested comment" },
+    ], "hash", async () => Buffer.from(""), () => {},
+  );
+
+  component.handleInput("j");
+  component.handleInput("j");
+
+  assert.equal((component as any).selectedComment()?.id, "agent-long");
+  assert.deepEqual((component as any).selectedRange(), { startLine: 3, endLine: 3 });
+});
+
+test("tab navigation starts from the active source line instead of the selected comment", () => {
+  const component = new FileReviewComponent(
+    makeTui(), theme as any, "/tmp/source.nix", Array.from({ length: 8 }, (_, index) => `line ${index + 1}`),
+    Array.from({ length: 8 }, (_, index) => `line ${index + 1}`),
+    [
+      { id: "agent-a", startLine: 2, endLine: 6, text: "Long comment" },
+      { id: "agent-b", startLine: 4, endLine: 4, text: "Middle comment" },
+      { id: "agent-c", startLine: 8, endLine: 8, text: "Last comment" },
+    ], "hash", async () => Buffer.from(""), () => {},
+  );
+
+  component.handleInput("\t");
+  component.handleInput("J");
+  component.handleInput("J");
+  assert.deepEqual((component as any).selectedRange(), { startLine: 2, endLine: 8 });
+  assert.equal((component as any).selectedComment()?.id, "agent-a");
+
+  component.handleInput("\t");
+  assert.equal((component as any).selectedComment()?.id, "agent-a");
+
+  component.handleInput("\x1b[Z");
+  assert.equal((component as any).selectedComment()?.id, "agent-b");
+});
+
+test("tab navigation keeps comments with the same range reachable", () => {
+  const component = new FileReviewComponent(
+    makeTui(), theme as any, "/tmp/source.nix", ["one", "two", "three", "four"],
+    ["one", "two", "three", "four"],
+    [
+      { id: "agent-a", startLine: 2, endLine: 2, text: "First same-line comment" },
+      { id: "agent-b", startLine: 2, endLine: 2, text: "Second same-line comment" },
+      { id: "agent-c", startLine: 4, endLine: 4, text: "Later comment" },
+    ], "hash", async () => Buffer.from(""), () => {},
+  );
+
+  component.handleInput("j");
+  assert.equal((component as any).selectedComment()?.id, "agent-a");
+
+  component.handleInput("\t");
+  assert.equal((component as any).selectedComment()?.id, "agent-b");
+
+  component.handleInput("\t");
+  assert.equal((component as any).selectedComment()?.id, "agent-c");
+
+  component.handleInput("\x1b[Z");
+  assert.equal((component as any).selectedComment()?.id, "agent-b");
+
+  component.handleInput("\x1b[Z");
+  assert.equal((component as any).selectedComment()?.id, "agent-a");
+});
+
+test("home and end select comments on their destination lines", () => {
+  const component = new FileReviewComponent(
+    makeTui(), theme as any, "/tmp/source.nix", ["one", "two", "three"], ["one", "two", "three"],
+    [
+      { id: "agent-first", startLine: 1, endLine: 1, text: "First line" },
+      { id: "agent-last", startLine: 3, endLine: 3, text: "Last line" },
+    ], "hash", async () => Buffer.from(""), () => {},
+  );
+
+  component.handleInput("G");
+  assert.equal((component as any).selectedComment()?.id, "agent-last");
+
+  component.handleInput("g");
+  assert.equal((component as any).selectedComment()?.id, "agent-first");
+});
+
 test("extends a selected multiline comment in both directions", () => {
   const component = new FileReviewComponent(
     makeTui(), theme as any, "/tmp/source.nix", ["one", "two", "three", "four", "five", "six"],

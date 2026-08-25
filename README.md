@@ -24,10 +24,17 @@ The overlay provides:
 - Stale-file refusal when the source changes during review.
 - Review feedback staged in Pi's composer without sending it automatically.
 
-Use `j` and `k` or the arrow keys to move. Use `Shift+J` and `Shift+K` to
-extend a range. Press `Tab` to move through comments. Press `a` to add a note,
-`r` to reply, `e` to edit a user note, `d` or `x` to delete one, and `s` or
-`Enter` to stage the review. Press `Esc` to cancel.
+Use `j` and `k` or the arrow keys to move. Moving onto any line covered by a
+comment selects that comment automatically without changing the source range:
+a single line, a subset of the comment, or a range extending beyond it remains
+exactly as selected. If comments overlap, the current comment stays selected
+while the source range still intersects it; otherwise the first comment in
+source order is selected. `Tab` and `Shift+Tab` jump to the next or previous
+comment relative to the active source line, rather than relative to stale
+comment focus. Comments sharing exactly the same range are visited in display
+order so each remains reachable. Use `Shift+J` and `Shift+K` to extend a range.
+Press `a` to add a note, `r` to reply, `e` to edit a user note, `d` or `x` to
+delete one, and `s` or `Enter` to stage the review. Press `Esc` to cancel.
 
 ## Install
 
