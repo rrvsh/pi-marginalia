@@ -105,6 +105,10 @@ function isUserComment(comment: ReviewComment): comment is UserComment {
 	return comment.id.startsWith("user-");
 }
 
+export function expandVisibleTabs(text: string): string {
+	return text.replaceAll("\t", "   ");
+}
+
 const editorTheme = (theme: Theme): EditorTheme => ({
 	borderColor: (text) => theme.fg("accent", text),
 	selectList: {
@@ -128,6 +132,7 @@ export class FileReviewComponent {
 	private sourceContentWidth = 1;
 	private sourceVisualOffsets: number[] = [];
 	private pendingCommentFocus: number | null = null;
+	private commentNavigationStarted = false;
 	private editing:
 		| { kind: "annotation"; startLine: number; endLine: number; commentId?: undefined }
 		| { kind: "reply"; startLine: number; endLine: number; parentId: string; commentId?: undefined }
@@ -210,12 +215,20 @@ export class FileReviewComponent {
 		};
 	}
 
+	private syncCommentSelectionToRange(): void {
+		const comments = this.allComments();
+		const range = this.selectedRange();
+		const selected = this.commentIndex === null ? undefined : comments[this.commentIndex];
+		if (selected && rangesIntersect(selected, range)) return;
+		const intersecting = comments.findIndex((comment) => rangesIntersect(comment, range));
+		this.commentIndex = intersecting >= 0 ? intersecting : null;
+	}
+
 	private commentIsHighlighted(comment: ReviewComment): boolean {
 		return rangesIntersect(comment, this.selectedRange());
 	}
 
 	private moveCursor(delta: number, extend = false): void {
-		this.commentIndex = null;
 		if (!extend) this.rangeAnchor = null;
 		if (extend && this.rangeAnchor === null) this.rangeAnchor = this.cursorLine;
 		if (extend && this.rangeAnchor !== null && this.cursorLine > this.rangeAnchor && delta < 0) {
@@ -225,6 +238,8 @@ export class FileReviewComponent {
 		} else {
 			this.cursorLine = Math.max(1, Math.min(this.lines.length, this.cursorLine + delta));
 		}
+		this.syncCommentSelectionToRange();
+		this.commentNavigationStarted = false;
 		this.keepCursorVisible();
 		this.refresh();
 	}
@@ -281,13 +296,41 @@ export class FileReviewComponent {
 		this.setStatus("Comment deleted");
 	}
 
+	private commentIndexFromSource(delta: number, comments: ReviewComment[]): number {
+		const range = this.selectedRange();
+		const selected = this.commentIndex === null ? undefined : comments[this.commentIndex];
+		if (selected) {
+			const peers = comments
+				.map((comment, index) => ({ comment, index }))
+				.filter(({ comment }) => comment.startLine === selected.startLine && comment.endLine === selected.endLine);
+			const peerIndex = peers.findIndex(({ index }) => index === this.commentIndex);
+			const nextPeer = peers[peerIndex + (delta > 0 ? 1 : -1)];
+			if (nextPeer) return nextPeer.index;
+		}
+		if (delta > 0) {
+			const next = comments.findIndex((comment) => comment.startLine > this.cursorLine);
+			if (next >= 0) return next;
+		} else {
+			for (let index = comments.length - 1; index >= 0; index--) {
+				if (comments[index]!.endLine < this.cursorLine) return index;
+			}
+		}
+		if (!this.commentNavigationStarted) {
+			if (selected && rangesIntersect(selected, range)) return this.commentIndex!;
+			const intersecting = comments.findIndex((comment) => rangesIntersect(comment, range));
+			if (intersecting >= 0) return intersecting;
+		}
+		return delta > 0 ? 0 : comments.length - 1;
+	}
+
 	private cycleComment(delta: number): void {
 		if (this.comments.length === 0) {
 			this.setStatus("No comments to select");
 			return;
 		}
 		const comments = this.allComments();
-		this.commentIndex = this.commentIndex === null ? (delta > 0 ? 0 : comments.length - 1) : (this.commentIndex + delta + comments.length) % comments.length;
+		this.commentIndex = this.commentIndexFromSource(delta, comments);
+		this.commentNavigationStarted = true;
 		const comment = this.selectedComment()!;
 		this.cursorLine = comment.endLine;
 		this.rangeAnchor = comment.endLine === comment.startLine ? null : comment.startLine;
@@ -437,23 +480,27 @@ export class FileReviewComponent {
 			return;
 		}
 		if (data === "g" || matchesKey(data, Key.home)) {
-			this.commentIndex = null;
 			this.rangeAnchor = null;
 			this.cursorLine = 1;
+			this.syncCommentSelectionToRange();
+			this.commentNavigationStarted = false;
 			this.keepCursorVisible();
 			this.refresh();
 			return;
 		}
 		if (data === "G" || matchesKey(data, Key.end)) {
-			this.commentIndex = null;
 			this.rangeAnchor = null;
 			this.cursorLine = this.lines.length;
+			this.syncCommentSelectionToRange();
+			this.commentNavigationStarted = false;
 			this.keepCursorVisible();
 			this.refresh();
 			return;
 		}
 		if (matchesKey(data, Key.space)) {
 			this.rangeAnchor = this.rangeAnchor === null ? this.cursorLine : null;
+			this.syncCommentSelectionToRange();
+			this.commentNavigationStarted = false;
 			this.refresh();
 			return;
 		}
@@ -606,7 +653,7 @@ export class FileReviewComponent {
 			output.push(...this.editor.render(Math.max(1, width)));
 		}
 		if (this.status) output.push(this.theme.fg("warning", truncateToWidth(this.status, width, "", false)));
-		return output.map((line) => truncateToWidth(line, Math.max(1, width), "", false));
+		return output.map((line) => truncateToWidth(expandVisibleTabs(line), Math.max(1, width), "", false));
 	}
 
 	render(width: number): string[] {
