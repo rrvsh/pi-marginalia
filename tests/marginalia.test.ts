@@ -4,9 +4,11 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
+import { visibleWidth } from "@earendil-works/pi-tui";
 import register, {
   commentFocusOffset,
   commentSort,
+  expandVisibleTabs,
   FileReviewComponent,
   formatRange,
   formatReviewFeedback,
@@ -236,6 +238,26 @@ test("tab navigation keeps comments with the same range reachable", () => {
   assert.equal((component as any).selectedComment()?.id, "agent-a");
 });
 
+test("tab from a source-selected comment focuses that comment before wrapping", () => {
+  const component = new FileReviewComponent(
+    makeTui(), theme as any, "/tmp/source.nix", ["one", "two", "three"], ["one", "two", "three"],
+    [
+      { id: "agent-first", startLine: 1, endLine: 1, text: "First line" },
+      { id: "agent-last", startLine: 3, endLine: 3, text: "Last line" },
+    ], "hash", async () => Buffer.from(""), () => {},
+  );
+
+  component.handleInput("G");
+  assert.equal((component as any).selectedComment()?.id, "agent-last");
+
+  component.handleInput("\t");
+  assert.equal((component as any).selectedComment()?.id, "agent-last");
+  assert.deepEqual((component as any).selectedRange(), { startLine: 3, endLine: 3 });
+
+  component.handleInput("\t");
+  assert.equal((component as any).selectedComment()?.id, "agent-first");
+});
+
 test("home and end select comments on their destination lines", () => {
   const component = new FileReviewComponent(
     makeTui(), theme as any, "/tmp/source.nix", ["one", "two", "three"], ["one", "two", "three"],
@@ -291,6 +313,20 @@ test("supports reply, edit, and delete flows", () => {
 
   component.handleInput("d");
   assert.doesNotMatch(component.render(100).join("\n"), /edited/);
+});
+
+test("expands visible tabs before terminal output", () => {
+  assert.equal(expandVisibleTabs("one\ttwo"), "one   two");
+
+  const component = new FileReviewComponent(
+    makeTui(), theme as any, "/tmp/source.nix", ["\t\tdeep"], ["\x1b[36m\t\tdeep\x1b[39m"],
+    [{ id: "agent-1", startLine: 1, endLine: 1, text: "tab\tcomment" }], "hash", async () => Buffer.from(""), () => {},
+  );
+
+  const rendered = component.render(80);
+
+  assert.equal(rendered.some((line) => line.includes("\t")), false);
+  assert.equal(rendered.every((line) => visibleWidth(line) <= 80), true);
 });
 
 test("bounds rendering to tiny terminal heights", () => {
