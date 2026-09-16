@@ -8,6 +8,7 @@ import { visibleWidth } from "@earendil-works/pi-tui";
 import register, {
   commentFocusOffset,
   commentSort,
+  cursorViewportOffset,
   expandVisibleTabs,
   FileReviewComponent,
   formatRange,
@@ -75,6 +76,122 @@ test("wraps source rows and focuses comments with two lines of context", () => {
   assert.equal(wrapSourceLine("0123456789", 4, true).length, 3);
   assert.equal(commentFocusOffset(6, [0, 1, 2, 3, 4, 5, 6, 7], 4, 7), 3);
   assert.equal(commentFocusOffset(1, [0, 1, 2], 4, 2), 0);
+});
+
+test("calculates top, center, and bottom viewport offsets for wrapped lines", () => {
+  const offsets = [0, 1, 2, 5, 6];
+
+  assert.equal(cursorViewportOffset(3, offsets, 9, "top"), 2);
+  assert.equal(cursorViewportOffset(3, offsets, 9, "center"), 0);
+  assert.equal(cursorViewportOffset(3, offsets, 9, "bottom"), 0);
+  assert.equal(cursorViewportOffset(4, offsets, 3, "bottom"), 3);
+});
+
+test("positions the current line without changing its selection", () => {
+  const lines = Array.from({ length: 30 }, (_, index) => `line ${index + 1}`);
+  const component = new FileReviewComponent(
+    makeTui(14), theme as any, "/tmp/source.nix", lines, lines,
+    [{ id: "agent-1", startLine: 15, endLine: 15, text: "Middle comment" }], "hash", async () => Buffer.from(""), () => {},
+  );
+
+  component.render(102);
+  for (let index = 1; index < 15; index++) component.handleInput("j");
+  const range = (component as any).selectedRange();
+  const commentId = (component as any).selectedComment()?.id;
+
+  component.handleInput("z");
+  component.handleInput("t");
+  component.render(102);
+  assert.equal((component as any).scrollOffset, 14);
+
+  component.handleInput("z");
+  component.handleInput("z");
+  component.render(102);
+  assert.equal((component as any).scrollOffset, 10);
+
+  component.handleInput("z");
+  component.handleInput("b");
+  component.render(102);
+  assert.equal((component as any).scrollOffset, 6);
+  assert.deepEqual((component as any).selectedRange(), range);
+  assert.equal((component as any).selectedComment()?.id, commentId);
+});
+
+test("positions a wrapped line by its full visual block", () => {
+  const lines = Array.from({ length: 30 }, (_, index) => index === 14 ? "x".repeat(130) : `line ${index + 1}`);
+  const component = new FileReviewComponent(
+    makeTui(14), theme as any, "/tmp/source.nix", lines, lines,
+    [], "hash", async () => Buffer.from(""), () => {},
+  );
+
+  component.render(102);
+  for (let index = 1; index < 15; index++) component.handleInput("j");
+
+  component.handleInput("z");
+  component.handleInput("t");
+  component.render(102);
+  assert.equal((component as any).scrollOffset, 14);
+
+  component.handleInput("z");
+  component.handleInput("z");
+  component.render(102);
+  assert.equal((component as any).scrollOffset, 11);
+
+  component.handleInput("z");
+  component.handleInput("b");
+  component.render(102);
+  assert.equal((component as any).scrollOffset, 8);
+});
+
+test("positions the final line at the top with blank rows below it", () => {
+  const lines = Array.from({ length: 12 }, (_, index) => `line ${index + 1}`);
+  const component = new FileReviewComponent(
+    makeTui(14), theme as any, "/tmp/source.nix", lines, lines,
+    [], "hash", async () => Buffer.from(""), () => {},
+  );
+
+  component.render(102);
+  component.handleInput("G");
+  component.handleInput("z");
+  component.handleInput("t");
+  const rendered = component.render(102).join("\n");
+
+  assert.equal((component as any).scrollOffset, 11);
+  assert.match(rendered, /12 line 12/);
+
+  component.render(102);
+  assert.equal((component as any).scrollOffset, 11);
+});
+
+test("escape cancels a pending viewport command without closing the review", () => {
+  let result: unknown;
+  const component = new FileReviewComponent(
+    makeTui(), theme as any, "/tmp/source.nix", ["one", "two"], ["one", "two"],
+    [], "hash", async () => Buffer.from(""), (value) => { result = value; },
+  );
+
+  component.handleInput("z");
+  component.handleInput("\x1b");
+  component.handleInput("j");
+
+  assert.equal(result, undefined);
+  assert.equal(component.isCompleted(), false);
+  assert.deepEqual((component as any).selectedRange(), { startLine: 2, endLine: 2 });
+});
+
+test("consumes an unsupported viewport suffix without running its command", () => {
+  let result: unknown;
+  const component = new FileReviewComponent(
+    makeTui(), theme as any, "/tmp/source.nix", ["one", "two"], ["one", "two"],
+    [], "hash", async () => Buffer.from(""), (value) => { result = value; },
+  );
+
+  component.handleInput("z");
+  component.handleInput("s");
+
+  assert.equal(result, undefined);
+  assert.equal((component as any).submitting, false);
+  assert.equal(component.isCompleted(), false);
 });
 
 test("source movement selects an intersecting comment without expanding to its range", () => {

@@ -96,6 +96,22 @@ export function commentFocusOffset(startLine: number, sourceVisualOffsets: numbe
 	return Math.max(0, Math.min(Math.max(0, totalVisualRows - sourceRows), visualStart));
 }
 
+export type ViewportPosition = "top" | "center" | "bottom";
+
+export function cursorViewportOffset(
+	line: number,
+	sourceVisualOffsets: number[],
+	sourceRows: number,
+	position: ViewportPosition,
+): number {
+	const visualStart = sourceVisualOffsets[Math.max(0, line - 1)] ?? 0;
+	const visualEnd = sourceVisualOffsets[line] ?? visualStart + 1;
+	const lineRows = Math.max(1, visualEnd - visualStart);
+	const availableRows = Math.max(0, sourceRows - lineRows);
+	const rowsAbove = position === "top" ? 0 : position === "center" ? Math.floor(availableRows / 2) : availableRows;
+	return Math.max(0, visualStart - rowsAbove);
+}
+
 function commentLabel(comment: ReviewComment): string {
 	if (!isUserComment(comment)) return "PI";
 	return comment.parentId ? "YOU reply" : "YOU";
@@ -132,6 +148,9 @@ export class FileReviewComponent {
 	private sourceContentWidth = 1;
 	private sourceVisualOffsets: number[] = [];
 	private pendingCommentFocus: number | null = null;
+	private pendingViewportPosition: ViewportPosition | null = null;
+	private manualViewport = false;
+	private awaitingViewportPosition = false;
 	private commentNavigationStarted = false;
 	private editing:
 		| { kind: "annotation"; startLine: number; endLine: number; commentId?: undefined }
@@ -203,6 +222,8 @@ export class FileReviewComponent {
 	}
 
 	private setStatus(text: string): void {
+		this.pendingViewportPosition = null;
+		this.manualViewport = false;
 		this.status = text;
 		this.refresh();
 	}
@@ -229,6 +250,8 @@ export class FileReviewComponent {
 	}
 
 	private moveCursor(delta: number, extend = false): void {
+		this.pendingViewportPosition = null;
+		this.manualViewport = false;
 		if (!extend) this.rangeAnchor = null;
 		if (extend && this.rangeAnchor === null) this.rangeAnchor = this.cursorLine;
 		if (extend && this.rangeAnchor !== null && this.cursorLine > this.rangeAnchor && delta < 0) {
@@ -245,6 +268,8 @@ export class FileReviewComponent {
 	}
 
 	private beginEditor(editing: FileReviewComponent["editing"], text: string): void {
+		this.pendingViewportPosition = null;
+		this.manualViewport = false;
 		this.editing = editing;
 		this.editor.setText(text);
 		this.status = "Enter save • Shift+Enter newline • Esc cancel";
@@ -329,6 +354,8 @@ export class FileReviewComponent {
 			return;
 		}
 		const comments = this.allComments();
+		this.pendingViewportPosition = null;
+		this.manualViewport = false;
 		this.commentIndex = this.commentIndexFromSource(delta, comments);
 		this.commentNavigationStarted = true;
 		const comment = this.selectedComment()!;
@@ -400,7 +427,17 @@ export class FileReviewComponent {
 			);
 			this.pendingCommentFocus = null;
 		}
-		this.keepCursorVisible();
+		if (this.pendingViewportPosition !== null) {
+			this.scrollOffset = cursorViewportOffset(
+				this.cursorLine,
+				this.sourceVisualOffsets,
+				this.sourceRows,
+				this.pendingViewportPosition,
+			);
+			this.pendingViewportPosition = null;
+		} else if (!this.manualViewport) {
+			this.keepCursorVisible();
+		}
 	}
 
 	private submit(): void {
@@ -443,9 +480,27 @@ export class FileReviewComponent {
 			this.refresh();
 			return;
 		}
+		if (this.awaitingViewportPosition) {
+			this.awaitingViewportPosition = false;
+			if (matchesKey(data, Key.escape)) {
+				this.refresh();
+				return;
+			}
+			const position = data === "t" ? "top" : data === "z" ? "center" : data === "b" ? "bottom" : null;
+			if (position !== null) {
+				this.pendingViewportPosition = position;
+				this.manualViewport = true;
+				this.refresh();
+			}
+			return;
+		}
 		if (matchesKey(data, Key.escape) || matchesKey(data, Key.ctrl("c"))) {
 			this.completed = true;
 			this.done({ cancelled: true });
+			return;
+		}
+		if (data === "z") {
+			this.awaitingViewportPosition = true;
 			return;
 		}
 		if (matchesKey(data, Key.shift("up")) || matchesKey(data, Key.shift("k")) || data === "K") {
@@ -474,12 +529,16 @@ export class FileReviewComponent {
 		}
 		if (data === "w") {
 			this.wrapEnabled = !this.wrapEnabled;
+			this.pendingViewportPosition = null;
+			this.manualViewport = false;
 			this.scrollOffset = 0;
 			this.status = `Source wrapping ${this.wrapEnabled ? "enabled" : "disabled"}`;
 			this.refresh();
 			return;
 		}
 		if (data === "g" || matchesKey(data, Key.home)) {
+			this.pendingViewportPosition = null;
+			this.manualViewport = false;
 			this.rangeAnchor = null;
 			this.cursorLine = 1;
 			this.syncCommentSelectionToRange();
@@ -489,6 +548,8 @@ export class FileReviewComponent {
 			return;
 		}
 		if (data === "G" || matchesKey(data, Key.end)) {
+			this.pendingViewportPosition = null;
+			this.manualViewport = false;
 			this.rangeAnchor = null;
 			this.cursorLine = this.lines.length;
 			this.syncCommentSelectionToRange();
@@ -628,7 +689,7 @@ export class FileReviewComponent {
 		const output: string[] = [];
 		const title = ` annotate_file · ${this.path} · ${this.lines.length} lines `;
 		output.push(this.theme.fg("accent", truncateToWidth(title, width, "…", true)));
-		output.push(this.theme.fg("dim", truncateToWidth(`Line ${formatRange(this.selectedRange())} · wrap ${this.wrapEnabled ? "on" : "off"} (w) · Shift+↑↓/J/K extend · Tab comments · a add · r reply · e edit · d delete · s submit · Esc cancel`, width, "…", true)));
+		output.push(this.theme.fg("dim", truncateToWidth(`Line ${formatRange(this.selectedRange())} · wrap ${this.wrapEnabled ? "on" : "off"} (w) · zt/zz/zb position · Shift+↑↓/J/K extend · Tab comments · a add · r reply · e edit · d delete · s submit · Esc cancel`, width, "…", true)));
 		if (wide) {
 			const sourceWidth = this.sourcePanelWidth(width);
 			const commentWidth = Math.max(1, width - sourceWidth - 3);

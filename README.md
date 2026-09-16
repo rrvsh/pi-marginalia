@@ -32,9 +32,11 @@ while the source range still intersects it; otherwise the first comment in
 source order is selected. `Tab` and `Shift+Tab` jump to the next or previous
 comment relative to the active source line, rather than relative to stale
 comment focus. Comments sharing exactly the same range are visited in display
-order so each remains reachable. Use `Shift+J` and `Shift+K` to extend a range.
-Press `a` to add a note, `r` to reply, `e` to edit a user note, `d` or `x` to
-delete one, and `s` or `Enter` to stage the review. Press `Esc` to cancel.
+order so each remains reachable. Use `zt`, `zz`, and `zb` to place the current
+line at the top, center, or bottom of the source viewport. Use `Shift+J` and
+`Shift+K` to extend a range. Press `a` to add a note, `r` to reply, `e` to edit
+a user note, `d` or `x` to delete one, and `s` or `Enter` to stage the review.
+Press `Esc` to cancel.
 
 ## Install
 
